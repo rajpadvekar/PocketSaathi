@@ -1,0 +1,158 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+model User {
+  id              String               @id // Matches Clerk User ID
+  email           String               @unique
+  name            String?
+  healthScore     Int                  @default(100)
+  streakCurrent   Int                  @default(0)
+  streakHighest   Int                  @default(0)
+  twinName        String               @default("Mitra Twin v1")
+  twinPersonality String               @default("Balanced Planner")
+  twinRisk        String               @default("medium")
+  onboardingComplete Boolean            @default(false)
+  createdAt       DateTime             @default(now())
+  updatedAt       DateTime             @updatedAt
+  
+  transactions       Transaction[]
+  budgets            Budget[]
+  goals              SavingsGoal[]
+  subscriptions      Subscription[]
+  walletMembers      FamilyWalletMember[]
+  sharedTransactions SharedTransaction[]
+}
+
+model Transaction {
+  id           String   @id @default(uuid())
+  userId       String
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String   // "income" | "expense"
+  category     String
+  subcategory  String?
+  amount       Float
+  merchant     String
+  date         String   // YYYY-MM-DD
+  note         String?
+  tags         String[] // PostgreSQL array of text
+  recurring    Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model Budget {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category  String
+  limit     Float
+  period    String   // "weekly" | "monthly"
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@unique([userId, category]) // Limit of one budget per category per user
+}
+
+model SavingsGoal {
+  id            String   @id @default(uuid())
+  userId        String
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name          String
+  targetAmount  Float
+  currentAmount Float    @default(0)
+  deadline      String   // YYYY-MM-DD
+  category      String
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model Subscription {
+  id              String   @id @default(uuid())
+  userId          String
+  user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  name            String
+  amount          Float
+  frequency       String   // "monthly" | "yearly"
+  nextBillingDate String   // YYYY-MM-DD
+  category        String
+  status          String   @default("active") // "active" | "paused"
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  @@index([userId])
+}
+
+model FamilyWallet {
+  id        String   @id @default(uuid())
+  name      String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  members      FamilyWalletMember[]
+  transactions SharedTransaction[]
+  invites      FamilyInvite[]
+}
+
+model FamilyWalletMember {
+  id           String       @id @default(uuid())
+  walletId     String
+  wallet       FamilyWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  role         String       // "owner" | "admin" | "member" | "viewer"
+  relationship String?      // "Father" | "Mother" | "Son" | "Daughter" | "Grandfather" | "Grandmother" | "Other"
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@unique([walletId, userId])
+  @@index([userId])
+}
+
+model FamilyInvite {
+  id           String       @id @default(uuid())
+  walletId     String
+  wallet       FamilyWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  email        String
+  role         String       // "admin" | "member" | "viewer"
+  relationship String?      // "Father" | "Mother" | "Son" | "Daughter" | "Grandfather" | "Grandmother" | "Other"
+  createdAt    DateTime     @default(now())
+
+  @@unique([walletId, email])
+}
+
+
+model SharedTransaction {
+  id           String       @id @default(uuid())
+  walletId     String
+  wallet       FamilyWallet @relation(fields: [walletId], references: [id], onDelete: Cascade)
+  userId       String
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type         String       // "income" | "expense"
+  category     String
+  subcategory  String?
+  amount       Float
+  merchant     String
+  date         String       // YYYY-MM-DD
+  note         String?
+  tags         String[]
+  recurring    Boolean      @default(false)
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  @@index([walletId])
+  @@index([userId])
+  @@index([createdAt])
+}
